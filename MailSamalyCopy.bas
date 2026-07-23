@@ -143,7 +143,6 @@ Public Sub ExportSelectedMails()
     Set olSel = olApp.ActiveExplorer.Selection
 
     If olSel.Count = 0 Then
-        SaveSetting "MailSamalyCopy", "Config", "LastFields", sInput
 
     MsgBox "メールを選択してください。" & vbCrLf & _
                "受信トレイ等でメールを1つ以上選択してから実行してください。", _
@@ -283,6 +282,19 @@ Public Sub ExportSelectedMails()
     oFso.DeleteFile sTmpFile
     Set oShell = Nothing
     Set oFso = Nothing
+
+    Dim sSaveFields As String
+    If fieldCount = ITEM_COUNT Then
+        sSaveFields = "ALL"
+    Else
+        sSaveFields = ""
+        Dim sf As Long
+        For sf = 1 To fieldCount
+            If sf > 1 Then sSaveFields = sSaveFields & ","
+            sSaveFields = sSaveFields & CStr(selectedFields(sf))
+        Next sf
+    End If
+    SaveSetting "MailSamalyCopy", "Config", "LastFields", sSaveFields
 
     MsgBox "クリップボードにコピーしました。" & vbCrLf & _
            "Excelに貼り付けてください。" & vbCrLf & vbCrLf & _
