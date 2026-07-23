@@ -1,12 +1,13 @@
 Option Explicit
 
 ' ============================================================
-' MailSamalyCopy - Outlook選択メール情報をExcelに一括出力
+' MailSamalyCopy - Outlook選択メール情報をクリップボードに一括出力
 ' ============================================================
 ' 使い方:
 '   1. Outlookでメールを複数選択
 '   2. Alt+F11 -> このモジュールを貼り付け
 '   3. ExportSelectedMails を実行（またはリボンに登録）
+'   4. クリップボードの内容をExcelに貼り付け
 ' ============================================================
 
 Private Const ITEM_COUNT As Long = 15
@@ -37,50 +38,51 @@ End Function
 Private Function GetFieldValue(ByVal oMail As Object, ByVal idx As Long) As String
     Dim i As Long
     Dim sAttach As String
+    Dim sVal As String
 
     On Error Resume Next
 
     Select Case idx
         Case 1
-            GetFieldValue = oMail.Subject
+            sVal = oMail.Subject
         Case 2
-            GetFieldValue = oMail.SenderName
+            sVal = oMail.SenderName
         Case 3
             ' ExchangeユーザーはSMTPアドレスを別途取得
             If oMail.SenderEmailType = "EX" Then
                 Dim oSender As Object
                 Set oSender = oMail.Sender
                 If Not oSender Is Nothing Then
-                    GetFieldValue = oSender.GetExchangeUser().PrimarySmtpAddress
+                    sVal = oSender.GetExchangeUser().PrimarySmtpAddress
                     If Err.Number <> 0 Then
                         Err.Clear
-                        GetFieldValue = oMail.SenderEmailAddress
+                        sVal = oMail.SenderEmailAddress
                     End If
                 Else
-                    GetFieldValue = oMail.SenderEmailAddress
+                    sVal = oMail.SenderEmailAddress
                 End If
                 Set oSender = Nothing
             Else
-                GetFieldValue = oMail.SenderEmailAddress
+                sVal = oMail.SenderEmailAddress
             End If
         Case 4
             If IsDate(oMail.ReceivedTime) Then
-                GetFieldValue = Format(oMail.ReceivedTime, "yyyy/mm/dd hh:nn:ss")
+                sVal = Format(oMail.ReceivedTime, "yyyy/mm/dd hh:nn:ss")
             End If
         Case 5
             If IsDate(oMail.SentOn) Then
-                GetFieldValue = Format(oMail.SentOn, "yyyy/mm/dd hh:nn:ss")
+                sVal = Format(oMail.SentOn, "yyyy/mm/dd hh:nn:ss")
             End If
         Case 6
-            GetFieldValue = oMail.To
+            sVal = oMail.To
         Case 7
-            GetFieldValue = oMail.CC
+            sVal = oMail.CC
         Case 8
-            GetFieldValue = oMail.BCC
+            sVal = oMail.BCC
         Case 9
-            GetFieldValue = oMail.Body
+            sVal = oMail.Body
         Case 10
-            GetFieldValue = oMail.HTMLBody
+            sVal = oMail.HTMLBody
         Case 11
             sAttach = ""
             If oMail.Attachments.Count > 0 Then
@@ -89,25 +91,33 @@ Private Function GetFieldValue(ByVal oMail As Object, ByVal idx As Long) As Stri
                     sAttach = sAttach & oMail.Attachments.Item(i).FileName
                 Next i
             End If
-            GetFieldValue = sAttach
+            sVal = sAttach
         Case 12
             Select Case oMail.Importance
-                Case 0: GetFieldValue = "低"
-                Case 1: GetFieldValue = "標準"
-                Case 2: GetFieldValue = "高"
-                Case Else: GetFieldValue = CStr(oMail.Importance)
+                Case 0: sVal = "低"
+                Case 1: sVal = "標準"
+                Case 2: sVal = "高"
+                Case Else: sVal = CStr(oMail.Importance)
             End Select
         Case 13
-            GetFieldValue = oMail.Categories
+            sVal = oMail.Categories
         Case 14
-            GetFieldValue = CStr(oMail.Size)
+            sVal = CStr(oMail.Size)
         Case 15
-            GetFieldValue = oMail.ConversationTopic
+            sVal = oMail.ConversationTopic
         Case Else
-            GetFieldValue = ""
+            sVal = ""
     End Select
 
     On Error GoTo 0
+
+    ' タブ・改行をスペースに置換（クリップボード出力でセル分割を防止）
+    sVal = Replace(sVal, vbTab, " ")
+    sVal = Replace(sVal, vbCrLf, " ")
+    sVal = Replace(sVal, vbCr, " ")
+    sVal = Replace(sVal, vbLf, " ")
+
+    GetFieldValue = sVal
 End Function
 
 ' ============================================================
@@ -118,9 +128,6 @@ Public Sub ExportSelectedMails()
     Dim olApp As Object
     Dim olSel As Object
     Dim oMail As Object
-    Dim xlApp As Object
-    Dim xlWb As Object
-    Dim xlWs As Object
 
     Dim selectedFields() As Long
     Dim fieldCount As Long
@@ -129,8 +136,7 @@ Public Sub ExportSelectedMails()
     Dim arrTokens() As String
     Dim i As Long, j As Long
     Dim nVal As Long
-    Dim colIdx As Long
-    Dim rowIdx As Long
+    Dim mailCount As Long
 
     ' --- 選択メールの取得 ---
     Set olApp = Application
@@ -217,80 +223,54 @@ Public Sub ExportSelectedMails()
         End If
     End If
 
-    ' --- Excel起動（Late Binding） ---
-    On Error Resume Next
-    Set xlApp = CreateObject("Excel.Application")
-    On Error GoTo 0
-
-    If xlApp Is Nothing Then
-        MsgBox "Excelを起動できませんでした。" & vbCrLf & _
-               "Microsoft Excelがインストールされているか確認してください。", _
-               vbCritical, "MailSamalyCopy"
-        GoTo CleanUp
-    End If
-
     On Error GoTo ErrHandler
 
-    xlApp.Visible = True
-    Set xlWb = xlApp.Workbooks.Add
-    Set xlWs = xlWb.Sheets(1)
-    xlWs.Name = "MailData"
+    ' --- クリップボード出力 ---
+    Dim sResult As String
+    Dim sLine As String
 
-    ' --- ヘッダー出力 ---
-    For colIdx = 1 To fieldCount
-        xlWs.Cells(1, colIdx).Value = GetFieldName(selectedFields(colIdx))
-    Next colIdx
+    ' ヘッダー行
+    sLine = ""
+    For i = 1 To fieldCount
+        If i > 1 Then sLine = sLine & vbTab
+        sLine = sLine & GetFieldName(selectedFields(i))
+    Next i
+    sResult = sLine
 
-    ' ヘッダー書式（青背景・白文字・太字）
-    With xlWs.Range(xlWs.Cells(1, 1), xlWs.Cells(1, fieldCount))
-        .Font.Bold = True
-        .Interior.Color = RGB(68, 114, 196)
-        .Font.Color = RGB(255, 255, 255)
-    End With
-
-    ' --- データ出力 ---
-    rowIdx = 2
+    ' データ行
+    mailCount = 0
     For i = 1 To olSel.Count
         ' MailItemのみ処理（会議出席依頼等はスキップ）
         If TypeName(olSel.Item(i)) = "MailItem" Then
             Set oMail = olSel.Item(i)
-            For colIdx = 1 To fieldCount
-                xlWs.Cells(rowIdx, colIdx).Value = GetFieldValue(oMail, selectedFields(colIdx))
-            Next colIdx
-            rowIdx = rowIdx + 1
+            sLine = ""
+            For j = 1 To fieldCount
+                If j > 1 Then sLine = sLine & vbTab
+                sLine = sLine & GetFieldValue(oMail, selectedFields(j))
+            Next j
+            sResult = sResult & vbCrLf & sLine
+            mailCount = mailCount + 1
         End If
     Next i
 
     ' メール0件チェック（全て非MailItemだった場合）
-    If rowIdx = 2 Then
+    If mailCount = 0 Then
         MsgBox "選択されたアイテムにメール（MailItem）が含まれていませんでした。" & vbCrLf & _
                "会議出席依頼等はスキップされます。", _
                vbInformation, "MailSamalyCopy"
-        xlWb.Close False
-        xlApp.Quit
         GoTo CleanUp
     End If
 
-    ' --- 列幅自動調整 ---
-    xlWs.Columns.AutoFit
+    ' クリップボードにコピー（DataObject Late Binding）
+    Dim oClip As Object
+    Set oClip = CreateObject("New:{1C3B4210-F441-11CE-B9EA-00AA006B1A69}")
+    oClip.SetText sResult
+    oClip.PutInClipboard
+    Set oClip = Nothing
 
-    ' 本文列が広がりすぎないよう最大幅を制限
-    For colIdx = 1 To fieldCount
-        If selectedFields(colIdx) = 9 Or selectedFields(colIdx) = 10 Then
-            If xlWs.Columns(colIdx).ColumnWidth > 80 Then
-                xlWs.Columns(colIdx).ColumnWidth = 80
-            End If
-        End If
-    Next colIdx
-
-    ' フィルター設定
-    xlWs.Range(xlWs.Cells(1, 1), xlWs.Cells(rowIdx - 1, fieldCount)).AutoFilter
-
-    ' カーソルをA1に
-    xlWs.Range("A1").Select
-
-    MsgBox "完了しました。" & vbCrLf & _
-           "出力件数: " & (rowIdx - 2) & " 件" & vbCrLf & _
+    MsgBox "クリップボードにコピーしました。" & vbCrLf & _
+           "Excelに貼り付けてください。" & vbCrLf & vbCrLf & _
+           "出力件数: " & mailCount & " 件" & vbCrLf & _
            "出力項目: " & fieldCount & " 項目", _
            vbInformation, "MailSamalyCopy"
 
@@ -302,17 +282,10 @@ ErrHandler:
            "エラー内容: " & Err.Description, _
            vbCritical, "MailSamalyCopy"
 
-    ' Excelが中途半端に開いていたら閉じる
-    On Error Resume Next
-    If Not xlWb Is Nothing Then xlWb.Close False
-    If Not xlApp Is Nothing Then xlApp.Quit
-    On Error GoTo 0
-
 CleanUp:
+    On Error Resume Next
+    Set oClip = Nothing
     Set oMail = Nothing
-    Set xlWs = Nothing
-    Set xlWb = Nothing
-    Set xlApp = Nothing
     Set olSel = Nothing
     Set olApp = Nothing
 End Sub
