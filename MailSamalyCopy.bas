@@ -276,7 +276,7 @@ Public Sub ExportSelectedMails()
     oStream.Close
     Set oStream = Nothing
     Set oShell = CreateObject("WScript.Shell")
-    oShell.Run "cmd /c chcp 65001 > nul & clip < """ & sTmpFile & """", 0, True
+    oShell.Run "powershell -command ""Get-Content -Path '" & sTmpFile & "' -Raw -Encoding UTF8 | Set-Clipboard""", 0, True
     Set oFso = CreateObject("Scripting.FileSystemObject")
     oFso.DeleteFile sTmpFile
     Set oShell = Nothing
