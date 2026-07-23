@@ -262,11 +262,10 @@ Public Sub ExportSelectedMails()
     End If
 
     ' クリップボードにコピー（DataObject Late Binding）
-    Dim oClip As Object
-    Set oClip = CreateObject("New:{1C3B4210-F441-11CE-B9EA-00AA006B1A69}")
-    oClip.SetText sResult
-    oClip.PutInClipboard
-    Set oClip = Nothing
+    Dim oHtml As Object
+    Set oHtml = CreateObject("htmlfile")
+    oHtml.parentWindow.clipboardData.SetData "text", sResult
+    Set oHtml = Nothing
 
     MsgBox "クリップボードにコピーしました。" & vbCrLf & _
            "Excelに貼り付けてください。" & vbCrLf & vbCrLf & _
@@ -284,7 +283,7 @@ ErrHandler:
 
 CleanUp:
     On Error Resume Next
-    Set oClip = Nothing
+    Set oHtml = Nothing
     Set oMail = Nothing
     Set olSel = Nothing
     Set olApp = Nothing
