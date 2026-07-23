@@ -261,11 +261,22 @@ Public Sub ExportSelectedMails()
         GoTo CleanUp
     End If
 
-    ' クリップボードにコピー（DataObject Late Binding）
-    Dim oHtml As Object
-    Set oHtml = CreateObject("htmlfile")
-    oHtml.parentWindow.clipboardData.SetData "text", sResult
-    Set oHtml = Nothing
+    ' クリップボードにコピー（clip.exe経由）
+    Dim sTmpFile As String
+    Dim oFso As Object
+    Dim oTmpFile As Object
+    Dim oShell As Object
+    sTmpFile = Environ("TEMP") & "\msc_temp.txt"
+    Set oFso = CreateObject("Scripting.FileSystemObject")
+    Set oTmpFile = oFso.CreateTextFile(sTmpFile, True)
+    oTmpFile.Write sResult
+    oTmpFile.Close
+    Set oTmpFile = Nothing
+    Set oShell = CreateObject("WScript.Shell")
+    oShell.Run "cmd /c chcp 65001 > nul & clip < """ & sTmpFile & """", 0, True
+    oFso.DeleteFile sTmpFile
+    Set oShell = Nothing
+    Set oFso = Nothing
 
     MsgBox "クリップボードにコピーしました。" & vbCrLf & _
            "Excelに貼り付けてください。" & vbCrLf & vbCrLf & _
@@ -283,7 +294,8 @@ ErrHandler:
 
 CleanUp:
     On Error Resume Next
-    Set oHtml = Nothing
+    Set oFso = Nothing
+    Set oShell = Nothing
     Set oMail = Nothing
     Set olSel = Nothing
     Set olApp = Nothing
