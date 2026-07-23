@@ -143,7 +143,9 @@ Public Sub ExportSelectedMails()
     Set olSel = olApp.ActiveExplorer.Selection
 
     If olSel.Count = 0 Then
-        MsgBox "メールを選択してください。" & vbCrLf & _
+        SaveSetting "MailSamalyCopy", "Config", "LastFields", sInput
+
+    MsgBox "メールを選択してください。" & vbCrLf & _
                "受信トレイ等でメールを1つ以上選択してから実行してください。", _
                vbExclamation, "MailSamalyCopy"
         GoTo CleanUp
