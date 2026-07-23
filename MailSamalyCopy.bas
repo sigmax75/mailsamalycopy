@@ -261,19 +261,23 @@ Public Sub ExportSelectedMails()
         GoTo CleanUp
     End If
 
-    ' クリップボードにコピー（clip.exe経由）
+    ' クリップボードにコピー（clip.exe + UTF-8）
     Dim sTmpFile As String
+    Dim oStream As Object
     Dim oFso As Object
-    Dim oTmpFile As Object
     Dim oShell As Object
     sTmpFile = Environ("TEMP") & "\msc_temp.txt"
-    Set oFso = CreateObject("Scripting.FileSystemObject")
-    Set oTmpFile = oFso.CreateTextFile(sTmpFile, True)
-    oTmpFile.Write sResult
-    oTmpFile.Close
-    Set oTmpFile = Nothing
+    Set oStream = CreateObject("ADODB.Stream")
+    oStream.Type = 2
+    oStream.Charset = "UTF-8"
+    oStream.Open
+    oStream.WriteText sResult
+    oStream.SaveToFile sTmpFile, 2
+    oStream.Close
+    Set oStream = Nothing
     Set oShell = CreateObject("WScript.Shell")
     oShell.Run "cmd /c chcp 65001 > nul & clip < """ & sTmpFile & """", 0, True
+    Set oFso = CreateObject("Scripting.FileSystemObject")
     oFso.DeleteFile sTmpFile
     Set oShell = Nothing
     Set oFso = Nothing
@@ -294,6 +298,7 @@ ErrHandler:
 
 CleanUp:
     On Error Resume Next
+    Set oStream = Nothing
     Set oFso = Nothing
     Set oShell = Nothing
     Set oMail = Nothing
