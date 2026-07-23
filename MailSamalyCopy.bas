@@ -30,6 +30,7 @@ Private Function GetFieldName(ByVal idx As Long) As String
         Case 13: GetFieldName = "カテゴリ"
         Case 14: GetFieldName = "メッセージサイズ"
         Case 15: GetFieldName = "会話トピック"
+        Case 0:    GetFieldName = ""
         Case Else: GetFieldName = ""
     End Select
 End Function
@@ -178,20 +179,12 @@ Public Sub ExportSelectedMails()
             selectedFields(i) = i
         Next i
     Else
-        ' カンマ区切り解析
+        ' カンマ区切り解析（重複許可、空トークンは空白セル）
         sInput = Replace(sInput, " ", "")
         arrTokens = Split(sInput, ",")
 
-        ' まず有効な値をカウント
-        fieldCount = 0
-        For i = LBound(arrTokens) To UBound(arrTokens)
-            If IsNumeric(arrTokens(i)) Then
-                nVal = CLng(arrTokens(i))
-                If nVal >= 1 And nVal <= ITEM_COUNT Then
-                    fieldCount = fieldCount + 1
-                End If
-            End If
-        Next i
+        ' トークン数をカウント（空含む）
+        fieldCount = UBound(arrTokens) - LBound(arrTokens) + 1
 
         If fieldCount = 0 Then
             MsgBox "項目を1つ以上選択してください。" & vbCrLf & _
@@ -200,28 +193,33 @@ Public Sub ExportSelectedMails()
             GoTo CleanUp
         End If
 
-        ' 配列に格納（重複除去付き）
+        ' 配列に格納（重複許可、空=0で空白セル）
         ReDim selectedFields(1 To fieldCount)
-        Dim usedFlags(1 To 15) As Boolean
         j = 0
         For i = LBound(arrTokens) To UBound(arrTokens)
-            If IsNumeric(arrTokens(i)) Then
+            j = j + 1
+            If Len(arrTokens(i)) = 0 Then
+                selectedFields(j) = 0
+            ElseIf IsNumeric(arrTokens(i)) Then
                 nVal = CLng(arrTokens(i))
                 If nVal >= 1 And nVal <= ITEM_COUNT Then
-                    If Not usedFlags(nVal) Then
-                        usedFlags(nVal) = True
-                        j = j + 1
-                        selectedFields(j) = nVal
-                    End If
+                    selectedFields(j) = nVal
+                Else
+                    selectedFields(j) = 0
                 End If
+            Else
+                selectedFields(j) = 0
             End If
         Next i
+        fieldCount = j
 
-        ' 重複除去後の実数で再調整
-        If j < fieldCount Then
-            fieldCount = j
-            ReDim Preserve selectedFields(1 To fieldCount)
+        If fieldCount = 0 Then
+            MsgBox "項目を1つ以上選択してください。" & vbCrLf & _
+                   "1～" & ITEM_COUNT & " の番号をカンマ区切りで入力してください。", _
+                   vbExclamation, "MailSamalyCopy"
+            GoTo CleanUp
         End If
+
     End If
 
     On Error GoTo ErrHandler
