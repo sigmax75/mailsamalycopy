@@ -160,7 +160,7 @@ Public Sub ExportSelectedMails()
     sPrompt = sPrompt & "ALL: 全項目を取得" & vbCrLf & vbCrLf
     sPrompt = sPrompt & "選択メール数: " & olSel.Count & " 件"
 
-    sInput = InputBox(sPrompt, "MailSamalyCopy - 項目選択", "ALL")
+    sInput = InputBox(sPrompt, "MailSamalyCopy", GetSetting("MailSamalyCopy", "Config", "LastFields", "ALL"))
 
     ' キャンセル押下（空文字が返る）
     If Len(Trim(sInput)) = 0 Then
@@ -284,16 +284,12 @@ Public Sub ExportSelectedMails()
     Set oFso = Nothing
 
     Dim sSaveFields As String
-    If fieldCount = ITEM_COUNT Then
-        sSaveFields = "ALL"
-    Else
         sSaveFields = ""
         Dim sf As Long
         For sf = 1 To fieldCount
             If sf > 1 Then sSaveFields = sSaveFields & ","
             sSaveFields = sSaveFields & CStr(selectedFields(sf))
         Next sf
-    End If
     SaveSetting "MailSamalyCopy", "Config", "LastFields", sSaveFields
 
     MsgBox "クリップボードにコピーしました。" & vbCrLf & _
