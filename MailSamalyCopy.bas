@@ -236,20 +236,47 @@ Public Sub ExportSelectedMails()
     Next i
     sResult = sLine
 
+    ' MailItemを配列に格納してReceivedTimeで昇順ソート
+    Dim mailItems() As Object
+    Dim mailItemCount As Long
+    mailItemCount = 0
+    For i = 1 To olSel.Count
+        If TypeName(olSel.Item(i)) = "MailItem" Then
+            mailItemCount = mailItemCount + 1
+            ReDim Preserve mailItems(1 To mailItemCount)
+            Set mailItems(mailItemCount) = olSel.Item(i)
+        End If
+    Next i
+
+    ' バブルソート（ReceivedTime昇順: 古い→新しい）
+    Dim swapped As Boolean
+    Dim tempMail As Object
+    Dim k As Long
+    If mailItemCount > 1 Then
+        Do
+            swapped = False
+            For k = 1 To mailItemCount - 1
+                If mailItems(k).ReceivedTime > mailItems(k + 1).ReceivedTime Then
+                    Set tempMail = mailItems(k)
+                    Set mailItems(k) = mailItems(k + 1)
+                    Set mailItems(k + 1) = tempMail
+                    swapped = True
+                End If
+            Next k
+        Loop While swapped
+    End If
+
     ' データ行
     mailCount = 0
-    For i = 1 To olSel.Count
-        ' MailItemのみ処理（会議出席依頼等はスキップ）
-        If TypeName(olSel.Item(i)) = "MailItem" Then
-            Set oMail = olSel.Item(i)
-            sLine = ""
-            For j = 1 To fieldCount
-                If j > 1 Then sLine = sLine & vbTab
-                sLine = sLine & GetFieldValue(oMail, selectedFields(j))
-            Next j
-            sResult = sResult & vbCrLf & sLine
-            mailCount = mailCount + 1
-        End If
+    For i = 1 To mailItemCount
+        Set oMail = mailItems(i)
+        sLine = ""
+        For j = 1 To fieldCount
+            If j > 1 Then sLine = sLine & vbTab
+            sLine = sLine & GetFieldValue(oMail, selectedFields(j))
+        Next j
+        sResult = sResult & vbCrLf & sLine
+        mailCount = mailCount + 1
     Next i
 
     ' メール0件チェック（全て非MailItemだった場合）
